@@ -12,6 +12,7 @@ import android.os.Bundle;
 import android.provider.MediaStore;
 import android.support.design.widget.FloatingActionButton;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -29,6 +30,7 @@ import com.vishal.mygateuser.models.User;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
@@ -42,6 +44,7 @@ public class MainActivity extends AppCompatActivity {
     private SharedPreferences.Editor editor;
     private ArrayList<User> usersData = new ArrayList<>();
     private RvUserAdapter rvUserAdapter;
+    private String[] permission = {Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE};
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -69,7 +72,11 @@ public class MainActivity extends AppCompatActivity {
         fabOpenCamera.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                EnableRuntimePermission();
+                if (EnableRuntimePermission()) {
+                    captureImageInitialization();
+                } else {
+                    Toast.makeText(MainActivity.this, "Permission Canceled.", Toast.LENGTH_LONG).show();
+                }
             }
         });
     }
@@ -91,17 +98,6 @@ public class MainActivity extends AppCompatActivity {
         mImageCaptureUri = savedInstanceState.getParcelable("imgUrl");
     }
 
-
-    @Override
-    public void onActivityResult(final int requestCode, int resultCode, final Intent data) {
-        if (requestCode == 7 && resultCode == RESULT_OK) {
-            Bitmap photo = (Bitmap) data.getExtras().get("data");
-            Uri tempUri = getImageUri(MainActivity.this, photo);
-            File finalFile = new File(getRealPathFromURI(tempUri));
-            saveUserInDataBase(String.valueOf(finalFile));
-            System.out.println(finalFile);
-        }
-    }
 
     public int getRandomNumber(int min, int max) {
         return (int) Math.floor(Math.random() * (max - min + 1)) + min;
@@ -151,13 +147,28 @@ public class MainActivity extends AppCompatActivity {
     }
 
 
-    public void EnableRuntimePermission() {
-        if (ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this,
-                Manifest.permission.CAMERA)) {
-            Toast.makeText(MainActivity.this, "CAMERA permission allows us to Access CAMERA app", Toast.LENGTH_LONG).show();
-        } else {
-            ActivityCompat.requestPermissions(MainActivity.this, new String[]{
-                    Manifest.permission.CAMERA}, RequestPermissionCode);
+    public boolean EnableRuntimePermission() {
+        List<String> stringsPermissions = new ArrayList<>();
+        for (String i : permission) {
+            if (ContextCompat.checkSelfPermission(MainActivity.this, i) != PackageManager.PERMISSION_GRANTED) {
+                stringsPermissions.add(i);
+            }
+        }
+        if (!stringsPermissions.isEmpty()) {
+            ActivityCompat.requestPermissions(MainActivity.this, stringsPermissions.toArray(new String[stringsPermissions.size()]), RequestPermissionCode);
+            return false;
+        }
+        return true;
+    }
+
+    @Override
+    public void onActivityResult(final int requestCode, int resultCode, final Intent data) {
+        if (requestCode == 7 && resultCode == RESULT_OK) {
+            Bitmap photo = (Bitmap) data.getExtras().get("data");
+            Uri tempUri = getImageUri(MainActivity.this, photo);
+            File finalFile = new File(getRealPathFromURI(tempUri));
+            saveUserInDataBase(String.valueOf(finalFile));
+            System.out.println(finalFile);
         }
     }
 
@@ -165,7 +176,7 @@ public class MainActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int RC, String[] per, int[] PResult) {
         switch (RC) {
             case RequestPermissionCode:
-                if (PResult.length > 0 && PResult[0] == PackageManager.PERMISSION_GRANTED) {
+                if (PResult.length > 0 && PResult[0] == PackageManager.PERMISSION_GRANTED && PResult[1] == PackageManager.PERMISSION_GRANTED) {
                     captureImageInitialization();
                 } else {
                     Toast.makeText(MainActivity.this, "Permission Canceled, Now your application cannot access CAMERA.", Toast.LENGTH_LONG).show();
